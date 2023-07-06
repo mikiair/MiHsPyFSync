@@ -58,13 +58,13 @@ class PFSRun:
                 raise PFSRunException("No database opened!?")
 
             commonColNames = self.getCommonColNames()
-            
+
             # match files source vs. target
             fileMatchStatus = self.matchFiles()
-                    
+
             if commonColNames == []:
                 return
-            
+
             self.compareFiles(commonColNames, fileMatchStatus)
         finally:
             # close database connections
@@ -82,12 +82,20 @@ class PFSRun:
 
             if self._countFiles == 0:
                 print("Databases contain no file data.")
-            else:
-                print(f"Compared {self._countFiles} file(s).")
-                if self._differingFileCount > 0:
-                    print(f"Found {self._differingFileCount} differing files.")
-                else:
-                    print("No differences.")
+                return
+
+            print("Match and comparison results:")
+            print(
+                (
+                    " # of files: {0:5}  # lonely: {1:5} "
+                    + "# extra: {2:5}  # differing: {3:5}"
+                ).format(
+                    len(fileMatchStatus),
+                    sum(m for m in fileMatchStatus.values() if m == 1),
+                    sum(m for m in fileMatchStatus.values() if m == 2),
+                    self._differingFileCount,
+                )
+            )
             # print("Took {0:.2f} seconds.".format(time.time() - startTime))
 
     def formatListStrings(self, dataList):
@@ -131,7 +139,9 @@ class PFSRun:
 
     def openFileListDB(self, dbfilename):
         db = pfsql.opendb(dbfilename)
-        if not pfsql.tableexists(db, "filelist") or not pfsql.tableexists(db, "dirlist"):
+        if not pfsql.tableexists(db, "filelist") or not pfsql.tableexists(
+            db, "dirlist"
+        ):
             pfsql.closedb(db)
             raise PFSRunException(
                 f"'{dbfilename}' is not a valid file listing database!"
@@ -143,7 +153,7 @@ class PFSRun:
         cntTargetCols = pfsql.gettablecolnum(self._targetDB, "filelist")
         colNamesSource = pfsql.gettablecolnames(self._sourceDB, "filelist")
         colNamesTarget = pfsql.gettablecolnames(self._targetDB, "filelist")
-        
+
         if cntSourceCols > 2 and cntTargetCols > 2:
             return [c for c in colNamesSource if c in colNamesTarget]
         else:
@@ -155,9 +165,7 @@ class PFSRun:
             "SELECT dirlist.path, filelist.path, filelist.filename FROM dirlist"
             + " INNER JOIN filelist ON dirlist.id = filelist.path"
         )
-        matchQuery = (
-            joinQuery + " WHERE dirlist.path = ? AND filelist.filename = ?"
-        )
+        matchQuery = joinQuery + " WHERE dirlist.path = ? AND filelist.filename = ?"
         for sourcerow in self._sourceDB[1].execute(joinQuery):
             self._countFiles += 1
             filePath = "\\".join((sourcerow[0], sourcerow[2]))
@@ -166,58 +174,64 @@ class PFSRun:
             res = self._targetDB[1].execute(
                 matchQuery,
                 (
-                    sourcerow[0], sourcerow[2],
+                    sourcerow[0],
+                    sourcerow[2],
                 ),
             )
             matchRow = res.fetchone()
             if matchRow is None:
                 fileMatchStatus[filePath] = 1
-                print(" ...no match! [on target]")
+                print(" ...lonely!")
                 continue
             else:
                 print("")
 
             fileMatchStatus[filePath] = 0
             # print(matchRow)
-            
+
         # match files target vs. source
         for targetrow in self._targetDB[1].execute(joinQuery):
             filePath = "\\".join((targetrow[0], targetrow[2]))
             if filePath not in fileMatchStatus:
                 self._countFiles += 1
                 fileMatchStatus[filePath] = 2
-                print(filePath, " ...no match! [on source]")
-                
+                print(filePath, " ...extra!")
+
         return fileMatchStatus
 
     def compareFiles(self, commonColNames, fileMatchStatus):
         # resulting row pattern: dirlist.path, dirlist.id = filelist.path, filelist.filename...
-        filelistCols = (", ".join(("filelist."+c) for c in commonColNames)).strip(", ")
+        filelistCols = (", ".join(("filelist." + c) for c in commonColNames)).strip(
+            ", "
+        )
         joinQuery = (
             f"SELECT dirlist.path, {filelistCols} FROM dirlist"
             + " INNER JOIN filelist ON dirlist.id = filelist.path"
         )
-        matchQuery = (
-            joinQuery + " WHERE dirlist.path = ? AND filelist.filename = ?"
-        )
+        matchQuery = joinQuery + " WHERE dirlist.path = ? AND filelist.filename = ?"
         # compare matching file's properties (existing in both DBs)
         for files in fileMatchStatus.items():
             if files[1] == 0:
                 lastslash = files[0].rindex("\\")
-                (path, filename) = (files[0][:lastslash], files[0][lastslash+1:])
+                (path, filename) = (files[0][:lastslash], files[0][lastslash + 1 :])
                 res = self._sourceDB[1].execute(matchQuery, (path, filename))
                 sourceRow = res.fetchone()
                 res = self._targetDB[1].execute(matchQuery, (path, filename))
                 targetRow = res.fetchone()
-                
+
                 firstDifference = True
                 for i in range(3, len(commonColNames) + 1):
                     if not sourceRow[i] == targetRow[i]:
                         if firstDifference:
-                            print(f"{files[0]} different!")
+                            print(f"{files[0]} ...different!")
                             firstDifference = False
                             self._differingFileCount += 1
-                        print("    @" + commonColNames[i-1], sourceRow[i], "->", targetRow[i])
-        
+                        print(
+                            "    @" + commonColNames[i - 1],
+                            sourceRow[i],
+                            "->",
+                            targetRow[i],
+                        )
+
     def closeFileListDB(self, db):
         pfsql.closedb(db)

@@ -47,21 +47,17 @@ def droptable(db, tableName):
 
 def gettablecolnum(db, tablename):
     """Return the number of columns in the table."""
-    selectCmd = (
-        f"SELECT COUNT(*) FROM pragma_table_info('{tablename}')"
-    )
+    selectCmd = f"SELECT COUNT(*) FROM pragma_table_info('{tablename}')"
     return db[1].execute(selectCmd).fetchone()[0]
 
 
 def gettablecolnames(db, tablename):
     """Return a list with column names of that table."""
-    selectCmd = (
-        f"SELECT name FROM pragma_table_info('{tablename}')"
-    )
+    selectCmd = f"SELECT name FROM pragma_table_info('{tablename}')"
     res = db[1].execute(selectCmd).fetchall()
     return [colname for colname, in res]
-    
-    
+
+
 def closedb(db):
     """Close the database connection."""
     db[0].close()
