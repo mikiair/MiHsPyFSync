@@ -36,9 +36,10 @@ class PFSOutSqlite(pfsout.PFSOutFile):
             except Exception:
                 pass
 
-        columnHeader = ["path", "filename", "match"]
+        columnHeader = ["path", "filename", "match INTEGER"]
         if len(self._commonColNames) > 0:
-            columnHeader.extend(self._commonColNames[2:])
+            columnsWithType = [c+" INTEGER" for c in self._commonColNames[2:]]
+            columnHeader.extend(columnsWithType)
 
         pfsql.createtable(self._db, "filecomp", columnHeader)
 
@@ -66,9 +67,9 @@ class PFSOutSqlite(pfsout.PFSOutFile):
             rowItems = [filePath, fileName, 0]
             for i in range(3, len(sourceRow)):
                 if (i - 1) in differences:
-                    rowItems.append("1" if sourceRow[i] > targetRow[i] else "-1")
+                    rowItems.append(1 if sourceRow[i] > targetRow[i] else -1)
                 else:
-                    rowItems.append("0")
+                    rowItems.append(0)
             self._dataSets.append(rowItems)
         else:
             self.executeInsertCompares()
