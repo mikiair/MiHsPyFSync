@@ -12,13 +12,12 @@ It takes a PFSParams object and performs the comparison.
 
 # standard imports
 import sys
+import time
 
 # local imports
 import pfslib.pfsout as pfsout
 import pfslib.pfsoutsqlite as pfsoutsqlite
 import pfslib.pfsql as pfsql
-
-# import time
 
 
 class PFSRunException(Exception):
@@ -44,7 +43,7 @@ class PFSRun:
 
     def Run(self):
         """Run the file database comparison."""
-        # startTime = time.time()
+        startTime = time.time()
 
         self._countFiles = 0
         self._differingFileCount = 0
@@ -86,7 +85,7 @@ class PFSRun:
             if self._sourceDB is not None:
                 self.closeFileListDB(self._sourceDB)
 
-            # print("Took {0:.2f} seconds.".format(time.time() - startTime))
+            print("Took {0:.2f} seconds.".format(time.time() - startTime))
 
     def openFileListDB(self, dbfilename):
         db = pfsql.opendb(dbfilename)
