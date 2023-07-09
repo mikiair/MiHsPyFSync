@@ -233,6 +233,10 @@ class PFSRun:
             if self._countFiles < self._params.FilesPerDot:
                 print(".", end="")
 
+        commonFileNum = sum(1 for m in fileMatchStatus.values() if m==0)
+        lonelyFileNum = sum(1 for m in fileMatchStatus.values() if m==1)
+        extraFileNum = sum(1 for m in fileMatchStatus.values() if m==2)
+        
         print("")
         print("Match results:")
         print(
@@ -241,15 +245,14 @@ class PFSRun:
             )
         )
         print(
-            "\t# of lonely: {0:5}\t# of extra:     {1:5}".format(
-                sum(m for m in fileMatchStatus.values() if m == 1),
-                sum(m for m in fileMatchStatus.values() if m == 2) // 2,
+            "\t# of common: {0:5}\t# of lonely:    {1:5}\t# of extra:     {2:5}".format(
+                commonFileNum, lonelyFileNum, extraFileNum,
             )
         )
         if withComparison:
             print(
                 "\t# of same:   {0:5}\t# of different: {1:5}".format(
-                    len(fileMatchStatus) - self._differingFileCount,
+                    commonFileNum - self._differingFileCount,
                     self._differingFileCount,
                 )
             )
