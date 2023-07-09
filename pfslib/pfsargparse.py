@@ -3,9 +3,8 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.0.1"
-__date__ = "07/06/2023"
-
+__version__ = "0.1.0"
+__date__ = "07/09/2023"
 """Classes in PFSArgParse derive from ArgumentParser and define different argument
 parsers with a set of default arguments for file listing comparison.
 """
@@ -18,6 +17,16 @@ from argparse import ArgumentParser
 class PFSArgParse(ArgumentParser):
     def __init__(self, description):
         super().__init__(description)
+
+        self.add_argument(
+            "-c",
+            "--ctime",
+            dest="ctime",
+            action="store_true",
+            default=False,
+            help="consider file creation time for comparison (if present in data),"
+            + " default ignored",
+        )
 
         self.add_argument(
             "source",

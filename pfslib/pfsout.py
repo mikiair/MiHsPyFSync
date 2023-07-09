@@ -3,8 +3,8 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.0.1"
-__date__ = "07/02/2023"
+__version__ = "0.1.0"
+__date__ = "07/09/2023"
 
 """Classes in pfsout handle the output to stdout or to a CSV writer file
 """
@@ -16,13 +16,22 @@ import csv
 class PFSOut:
     """Abstract base class for result output."""
 
-    def __init__(self):
-        pass
+    def __init__(self, commonColNames):
+        self._commonColNames = commonColNames
 
     def openout(self, mode):
         pass
 
-    def writeResult(self, formattedList):
+    def writeMatch(self, filePath, fileName, matchStatus):
+        pass
+
+    def flushMatches(self):
+        pass
+
+    def writeCompare(self, filePath, fileName, differences, sourceRow, targetRow):
+        pass
+
+    def flushCompares(self):
         pass
 
     def close(self):
@@ -32,49 +41,101 @@ class PFSOut:
 class PFSOutStd(PFSOut):
     """Class for result output to stdout."""
 
-    def __init__(self):
-        self._currentFolder = ""
+    def __init__(self, commonColNames):
+        super().__init__(commonColNames)
+        self._currentFolder = None
 
-    def writeResult(self, formattedList):
+    def writeMatch(self, filePath, fileName, matchStatus):
         """Print file data to stdout. If file is from next folder first print the
         folder name in a separate line.
         """
-        if not formattedList[0] == self._currentFolder:
-            self._currentFolder = formattedList[0]
-            print(self._currentFolder + ":")
-        if len(formattedList) > 2:
-            print("\t" + formattedList[1] + " - " + "/".join(formattedList[2:]))
+        if not filePath == self._currentFolder:
+            self._currentFolder = filePath
+            print(self._currentFolder + "\\")
+
+        print("\t" + fileName, end="")
+
+        if matchStatus == 1:
+            print(" ...lonely!")
+        elif matchStatus == 2:
+            print(" ...extra!")
         else:
-            print("\t" + formattedList[1])
+            print("")
+
+    def writeCompare(self, filePath, fileName, differences, sourceRow, targetRow):
+        if not filePath == self._currentFolder:
+            self._currentFolder = filePath
+            print(self._currentFolder + "\\")
+
+        if len(differences) == 0:
+            print(f"\t{fileName} ...same")
+            return
+
+        print(f"\t{fileName} ...different:")
+        for d in differences:
+            if not self._commonColNames[d].find("time") == -1:
+                maxLen = 19
+            else:
+                maxLen = 16
+
+            srFormatted = str(sourceRow[d + 1])
+            srFormatted = srFormatted[: min(maxLen, len(srFormatted))].ljust(19, ".")
+            trFormatted = str(targetRow[d + 1])
+            trFormatted = trFormatted[: min(maxLen, len(trFormatted))].ljust(19, ".")
+
+            print(
+                "\t\t@{0}\t{1} -> {2}".format(
+                    self._commonColNames[d], srFormatted, trFormatted
+                )
+            )
 
 
 class PFSOutFile(PFSOut):
     """Class for result output to a file."""
 
-    def __init__(self, filePath, columnNames):
+    def __init__(self, filePath, commonColNames):
+        super().__init__(commonColNames)
         self._filePath = filePath
-        self._columnNames = columnNames
 
 
 class PFSOutCSV(PFSOutFile):
     """Class for result output to CSV file."""
 
-    def __init__(self, filePath, columnNames):
-        super().__init(filePath, columnNames)
+    def __init__(self, filePath, commonColNames):
+        super().__init__(filePath, commonColNames)
+        self._outFile = None
 
     def openout(self, mode):
         self._outFile = open(self._filePath, mode, newline="")
         self._csvWriter = csv.writer(self._outFile, dialect="excel-tab", delimiter=";")
-        self._csvWriter.writerow(self._columnNames)
+        columnHeader = ["path", "filename", "match"]
+        if len(self._commonColNames) > 0:
+            columnHeader.extend(self._commonColNames[2:])
+        self._csvWriter.writerow(columnHeader)
 
-    def writeResult(self, formattedList):
+    def writeMatch(self, filePath, fileName, matchStatus):
         """Write result data as a new line into CSV file."""
         try:
-            self._csvWriter.writerow(formattedList)
+            self._csvWriter.writerow([filePath, fileName, matchStatus])
+        except (Exception):
+            # handle invalid chars or invalidly encoded chars
+            self._csvWriter.writerow(["Error in output encoding!"])
+        self._outFile.flush()
+
+    def writeCompare(self, filePath, fileName, differences, sourceRow, targetRow):
+        try:
+            rowItems = [filePath, fileName, 0]
+            for i in range(3, len(sourceRow)):
+                if (i - 1) in differences:
+                    rowItems.append("1" if sourceRow[i] > targetRow[i] else "-1")
+                else:
+                    rowItems.append("0")
+            self._csvWriter.writerow(rowItems)
         except (Exception):
             # handle invalid chars or invalidly encoded chars
             self._csvWriter.writerow(["Error in output encoding!"])
         self._outFile.flush()
 
     def close(self):
-        self._outFile.close()
+        if self._outFile is not None:
+            self._outFile.close()

@@ -3,8 +3,8 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.0.1"
-__date__ = "07/06/2023"
+__version__ = "0.1.0"
+__date__ = "07/09/2023"
 
 """Compare file information saved in two Sqlite databases.
 """
@@ -26,13 +26,14 @@ try:
     params = pfsparams.PFSParams(
         args.source,
         args.target,
+        args.ctime,
         args.outfile,
         args.overwrite + args.append,
         args.nodots,
         args.dots,
     )
 
-    print("Comparing databases...")
+    print("Match and compare databases...")
 
     run = pfsrun.PFSRun(params)
 

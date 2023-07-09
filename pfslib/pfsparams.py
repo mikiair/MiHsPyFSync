@@ -3,8 +3,8 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.0.1"
-__date__ = "07/06/2023"
+__version__ = "0.1.0"
+__date__ = "07/09/2023"
 
 """Class PFSParams defines a set of parameters used for comparing file lists:
 source and target database files, a file for result output,
@@ -21,9 +21,12 @@ class PFSParams:
     and a file for result output, and additional attribute for stdout usage.
     """
 
-    def __init__(self, sourcedb, targetdb, outfile, outexistsmode, nodots, dots):
+    def __init__(
+        self, sourcedb, targetdb, comparectime, outfile, outexistsmode, nodots, dots
+    ):
         self._SourceDB = sourcedb
         self._TargetDB = targetdb
+        self._CompareCTime = comparectime
         self._OutFile = outfile
         self._UseStdOut = outfile is None
         if not self._UseStdOut:
@@ -47,6 +50,11 @@ class PFSParams:
         return self._TargetDB
 
     TargetDB = property(getTargetDB)
+
+    def getCompareCTime(self, doc="Compare file creation times"):
+        return self._CompareCTime
+
+    CompareCTime = property(getCompareCTime)
 
     def getOutFilePath(self, doc="Determines the filename of the output file"):
         return self._OutFilePath
@@ -101,4 +109,11 @@ class PFSParams:
         if not self._TargetDB.is_file():
             raise IsADirectoryError("'{0}' is not a file!".format(self._TargetDB))
 
+        self.resolveOutFilePath(self._OutFile)
+
         return True
+
+    def resolveOutFilePath(self, outfile):
+        self._OutFilePath = (
+            pathlib.Path(outfile).resolve() if outfile is not None else None
+        )
