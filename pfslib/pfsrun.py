@@ -260,4 +260,4 @@ class PFSRun:
 
     def printdot(self):
         if self._params.ShowDots and self._countFiles % self._params.FilesPerDot == 0:
-            print(".", end="")
+            print(".", end="", flush=True)
