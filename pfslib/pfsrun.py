@@ -3,8 +3,8 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.1.0"
-__date__ = "07/09/2023"
+__version__ = "0.1.1"
+__date__ = "07/14/2023"
 
 """Class PFSRun defines the basic file listing comparison behaviour.
 It takes a PFSParams object and performs the comparison.
@@ -122,6 +122,16 @@ class PFSRun:
             self._pfsout = pfsout.PFSOutStd(self._commonColNames)
         else:
             print("Write results to {}".format(self._params.OutFilePath))
+
+            if self._params.OutExistsMode == "":
+                if self._params.OutFilePath.exists():
+                    inputres = input("Output file already exists. Overwrite (Y/n)?")
+                    if inputres != "" and inputres != "Y" and inputres != "y":
+                        sys.exit(0)
+                overwrite = "w"
+            else:
+                overwrite = self._params.OutExistsMode
+
             if self._params.OutFileType == 1:
                 self._pfsout = pfsoutsqlite.PFSOutSqlite(
                     self._params.OutFilePath,
@@ -132,15 +142,6 @@ class PFSRun:
                     self._params.OutFilePath,
                     self._commonColNames,
                 )
-
-            if self._params.OutExistsMode == "":
-                if self._params.OutFilePath.exists():
-                    inputres = input("Output file already exists. Overwrite (Y/n)?")
-                    if inputres != "" and inputres != "Y" and inputres != "y":
-                        sys.exit(0)
-                overwrite = "w"
-            else:
-                overwrite = self._params.OutExistsMode
 
             self._pfsout.openout(overwrite)
 
