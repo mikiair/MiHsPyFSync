@@ -3,8 +3,8 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.1.0"
-__date__ = "07/09/2023"
+__version__ = "0.2.0"
+__date__ = "07/16/2023"
 
 """Classes in pfsout handle the output to stdout or to a CSV writer file
 """

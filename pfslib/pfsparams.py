@@ -3,8 +3,8 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.1.0"
-__date__ = "07/09/2023"
+__version__ = "0.2.0"
+__date__ = "07/16/2023"
 
 """Class PFSParams defines a set of parameters used for comparing file lists:
 source and target database files, a file for result output,
@@ -21,22 +21,20 @@ class PFSParams:
     and a file for result output, and additional attribute for stdout usage.
     """
 
-    def __init__(
-        self, sourcedb, targetdb, comparectime, outfile, outexistsmode, nodots, dots
-    ):
-        self._SourceDB = sourcedb
-        self._TargetDB = targetdb
-        self._CompareCTime = comparectime
-        self._OutFile = outfile
-        self._UseStdOut = outfile is None
+    def __init__(self, args):
+        self._SourceDB = args.source
+        self._TargetDB = args.target
+        self._CompareCTime = args.ctime
+        self._OutFile = args.outfile
+        self._UseStdOut = args.outfile is None
         if not self._UseStdOut:
-            self._OutFileType = 0 if str(outfile).lower().endswith(".csv") else 1
+            self._OutFileType = 0 if str(args.outfile).lower().endswith(".csv") else 1
         else:
             self._OutFileType = None
-        self._OutExistsMode = outexistsmode
-        self._ShowDots = not self._UseStdOut and not nodots
+        self._OutExistsMode = args.overwrite + args.update
+        self._ShowDots = not self._UseStdOut and not args.nodots
         if self._ShowDots:
-            self._FilesPerDot = pow(10, dots)
+            self._FilesPerDot = pow(10, args.dots)
         else:
             self._FilesPerDot = 0
         self.IsValid()

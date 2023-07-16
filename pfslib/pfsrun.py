@@ -3,8 +3,8 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.1.1"
-__date__ = "07/14/2023"
+__version__ = "0.2.0"
+__date__ = "07/16/2023"
 
 """Class PFSRun defines the basic file listing comparison behaviour.
 It takes a PFSParams object and performs the comparison.
@@ -43,7 +43,7 @@ class PFSRun:
 
     def Run(self):
         """Run the file database comparison."""
-        startTime = time.time()
+        resultStats = None
 
         self._countFiles = 0
         self._differingFileCount = 0
@@ -56,36 +56,43 @@ class PFSRun:
                 raise PFSRunException("No database opened!?")
 
             self._doCompare = self.getCommonColNames()
+            
+            # call after source/target database were opened
+            # and common column names were set
             self.createpfsout()
+            
+            # set start time after possible user interaction in createpflout
+            startTime = time.time()
 
-            # match files source vs. target
-            fileMatchStatus = self.matchFiles()
+            try:
+                # match files source vs. target
+                fileMatchStatus = self.matchFiles()
 
-            if self._countFiles == 0:
-                # TODO possibly wrong if compare still open!?
-                print("Databases contain no file data.")
-                return
+                if self._countFiles == 0:
+                    print("Databases contain no file data.")
+                    return
 
-            if not self._doCompare:
-                self.printResults(fileMatchStatus, False)
-                return
+                # compare properties of files found in both databases
+                if self._doCompare:
+                    self.compareFiles(fileMatchStatus)
 
-            # compare properties of files found in both databases
-            self.compareFiles(fileMatchStatus)
+                resultStats = self.getResultStats(fileMatchStatus)
+                self.printResults(resultStats)
+            finally:
+                duration = time.time() - startTime
 
-            self.printResults(fileMatchStatus)
-        finally:
-            # close outfile
-            if self._pfsout is not None:
+                # close outfile
+                if self._params.OutFileType == 1 and resultStats is not None:
+                    self._pfsout.updateStats(resultStats, duration)
                 self._pfsout.close()
-
+                
+                print("Took {0:.2f} seconds.".format(duration))
+        finally:
             # close database connections
             if self._targetDB is not None:
                 self.closeFileListDB(self._targetDB)
             if self._sourceDB is not None:
                 self.closeFileListDB(self._sourceDB)
-
-            print("Took {0:.2f} seconds.".format(time.time() - startTime))
 
     def openFileListDB(self, dbfilename):
         db = pfsql.opendb(dbfilename)
@@ -100,7 +107,7 @@ class PFSRun:
 
     def getCommonColNames(self):
         """Get a list of column names present in both 'filelist' tables
-        in the two databases compared.
+        in the two databases compared. Return true if this list is not empty.
         """
         cntSourceCols = pfsql.gettablecolnum(self._sourceDB, "filelist")
         cntTargetCols = pfsql.gettablecolnum(self._targetDB, "filelist")
@@ -108,9 +115,14 @@ class PFSRun:
         colNamesTarget = pfsql.gettablecolnames(self._targetDB, "filelist")
 
         if cntSourceCols > 2 and cntTargetCols > 2:
-            self._commonColNames = [c for c in colNamesSource if c in colNamesTarget]
+            self._commonColNames = [
+                c for c in colNamesSource if not c == "id" and c in colNamesTarget
+            ]
             if not self._params.CompareCTime:
-                self._commonColNames.remove("ctime")
+                try:
+                    self._commonColNames.remove("ctime")
+                except Exception:
+                    pass
             return not self._commonColNames == []
         else:
             self._commonColNames = []
@@ -120,30 +132,34 @@ class PFSRun:
         """Create the output object for data display or storage."""
         if self._params.UseStdOut:
             self._pfsout = pfsout.PFSOutStd(self._commonColNames)
+            return
+
+        print("Write results to {}".format(self._params.OutFilePath))
+
+        if self._params.OutExistsMode == "":
+            if self._params.OutFilePath.exists():
+                inputres = input("Output file already exists. Overwrite (Y/n)?")
+                if inputres != "" and inputres != "Y" and inputres != "y":
+                    sys.exit(0)
+            overwrite = "w"
         else:
-            print("Write results to {}".format(self._params.OutFilePath))
+            overwrite = self._params.OutExistsMode
 
-            if self._params.OutExistsMode == "":
-                if self._params.OutFilePath.exists():
-                    inputres = input("Output file already exists. Overwrite (Y/n)?")
-                    if inputres != "" and inputres != "Y" and inputres != "y":
-                        sys.exit(0)
-                overwrite = "w"
-            else:
-                overwrite = self._params.OutExistsMode
+        if self._params.OutFileType == 1:
+            self._pfsout = pfsoutsqlite.PFSOutSqlite(
+                self._params.OutFilePath,
+                self._commonColNames,
+            )
+        else:
+            self._pfsout = pfsout.PFSOutCSV(
+                self._params.OutFilePath,
+                self._commonColNames,
+            )
 
-            if self._params.OutFileType == 1:
-                self._pfsout = pfsoutsqlite.PFSOutSqlite(
-                    self._params.OutFilePath,
-                    self._commonColNames,
-                )
-            else:
-                self._pfsout = pfsout.PFSOutCSV(
-                    self._params.OutFilePath,
-                    self._commonColNames,
-                )
+        self._pfsout.openout(overwrite)
 
-            self._pfsout.openout(overwrite)
+        if self._params.OutFileType == 1:
+            self._pfsout.writeStats(self._params)
 
     def matchFiles(self):
         """Return a dictionary with filenames found in one or both databases,
@@ -179,7 +195,7 @@ class PFSRun:
                     self._pfsout.writeMatch(sourcerow[0], sourcerow[2], 0)
                 self.printdot()
 
-            # match files target vs. source
+            # match files target vs. source to find extras
             for targetrow in self._targetDB[1].execute(joinQuery):
                 filePath = "\\".join((targetrow[0], targetrow[2]))
                 if filePath not in fileMatchStatus:
@@ -229,32 +245,42 @@ class PFSRun:
         finally:
             self._pfsout.flushCompares()
 
-    def printResults(self, fileMatchStatus, withComparison=True):
+    def getResultStats(self, fileMatchStatus):
+        commonFileNum = sum(1 for m in fileMatchStatus.values() if m == 0)
+        lonelyFileNum = sum(1 for m in fileMatchStatus.values() if m == 1)
+        extraFileNum = sum(1 for m in fileMatchStatus.values() if m == 2)
+
+        if not self._doCompare:
+            return (len(fileMatchStatus), commonFileNum, lonelyFileNum, extraFileNum)
+
+        return (
+            len(fileMatchStatus),
+            commonFileNum,
+            lonelyFileNum,
+            extraFileNum,
+            commonFileNum - self._differingFileCount,
+            self._differingFileCount,
+        )
+
+    def printResults(self, resultStats):
         if self._params.ShowDots:
             if self._countFiles < self._params.FilesPerDot:
                 print(".", end="")
 
-        commonFileNum = sum(1 for m in fileMatchStatus.values() if m==0)
-        lonelyFileNum = sum(1 for m in fileMatchStatus.values() if m==1)
-        extraFileNum = sum(1 for m in fileMatchStatus.values() if m==2)
-        
         print("")
         print("Match results:")
-        print(
-            "\t# of files:  {0:5}".format(
-                len(fileMatchStatus),
-            )
-        )
+        print("\t# of files:  {0:5}".format(resultStats[0]))
         print(
             "\t# of common: {0:5}\t# of lonely:    {1:5}\t# of extra:     {2:5}".format(
-                commonFileNum, lonelyFileNum, extraFileNum,
+                resultStats[1],
+                resultStats[2],
+                resultStats[3],
             )
         )
-        if withComparison:
+        if len(resultStats) == 6:
             print(
                 "\t# of same:   {0:5}\t# of different: {1:5}".format(
-                    commonFileNum - self._differingFileCount,
-                    self._differingFileCount,
+                    resultStats[4], resultStats[5]
                 )
             )
 

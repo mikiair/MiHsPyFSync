@@ -3,12 +3,14 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.1.0"
-__date__ = "07/09/2023"
+__version__ = "0.2.0"
+__date__ = "07/16/2023"
+
 """Class handles output of file comparison results to SQLite database.
 """
 
 # standard imports
+from datetime import datetime
 
 # local imports
 import pfslib.pfsout as pfsout
@@ -31,19 +33,65 @@ class PFSOutSqlite(pfsout.PFSOutFile):
         self._db = pfsql.opendb(self._filePath)
 
         if mode == "w":
-            try:
-                pfsql.droptable(self._db, "filecomp")
-            except Exception:
-                pass
+            self.droptables()
 
+        self.setuptables()
+
+        self._dataSets = []
+
+    def droptables(self):
+        try:
+            pfsql.droptable(self._db, "stats", True)
+            pfsql.droptable(self._db, "filecomp", True)
+        except Exception:
+            print("Error while clearing existing data tables (check recommended)!?")
+
+    def setuptables(self):
         columnHeader = ["path", "filename", "match INTEGER"]
         if len(self._commonColNames) > 0:
-            columnsWithType = [c+" INTEGER" for c in self._commonColNames[2:]]
+            columnsWithType = [c + " INTEGER" for c in self._commonColNames[2:]]
             columnHeader.extend(columnsWithType)
 
         pfsql.createtable(self._db, "filecomp", columnHeader)
 
-        self._dataSets = []
+    def writeStats(self, params):
+        """Create statistics table if not existing and append a new row."""
+        pfsql.createtable(
+            self._db,
+            "stats",
+            [
+                "id INTEGER PRIMARY KEY",
+                "timestamp",
+                "source",
+                "target",
+                "nfiles",
+                "ncommon",
+                "nlonely",
+                "nextra",
+                "nsame",
+                "ndifferent",
+                "duration",
+            ],
+            True,
+        )
+        self._statrowID = pfsql.insertidrow(
+            self._db,
+            "stats",
+            (11 * "?, ").strip(", "),
+            (
+                None,
+                datetime.now(),
+                str(params.SourceDB),
+                str(params.TargetDB),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+        )
 
     def writeMatch(self, filePath, fileName, matchStatus):
         if len(self._dataSets) < 50:
@@ -78,6 +126,40 @@ class PFSOutSqlite(pfsout.PFSOutFile):
         """Write remaining compare datasets to database."""
         if len(self._dataSets) > 0:
             self.executeInsertCompares()
+
+    def updateStats(self, resultStats, duration):
+        if len(resultStats) < 5:
+            columnPattern = (
+                "=?, ".join(["nfiles", "ncommon", "nlonely", "nextra", "duration"])
+                + "=?"
+            )
+            nfiles, ncommon, nlonely, nextra = resultStats
+            params = (nfiles, ncommon, nlonely, nextra, duration)
+        else:
+            columnPattern = (
+                "=?, ".join(
+                    [
+                        "nfiles",
+                        "ncommon",
+                        "nlonely",
+                        "nextra",
+                        "nsame",
+                        "ndifferent",
+                        "duration",
+                    ]
+                )
+                + "=?"
+            )
+            nfiles, ncommon, nlonely, nextra, nsame, ndifferent = resultStats
+            params = (nfiles, ncommon, nlonely, nextra, nsame, ndifferent, duration)
+
+        pfsql.updaterow(
+            self._db,
+            "stats",
+            columnPattern,
+            f"ID={self._statrowID}",
+            params,
+        )
 
     def close(self):
         """Close database connection."""

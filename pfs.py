@@ -3,8 +3,8 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.1.0"
-__date__ = "07/09/2023"
+__version__ = "0.2.0"
+__date__ = "07/16/2023"
 
 """Compare file information saved in two Sqlite databases.
 """
@@ -23,15 +23,7 @@ args = parser.parse_args()
 
 try:
     # create parameter object
-    params = pfsparams.PFSParams(
-        args.source,
-        args.target,
-        args.ctime,
-        args.outfile,
-        args.overwrite + args.append,
-        args.nodots,
-        args.dots,
-    )
+    params = pfsparams.PFSParams(args)
 
     print("Match and compare databases...")
 
