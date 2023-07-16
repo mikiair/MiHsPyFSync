@@ -17,7 +17,7 @@ Python based comparison of two Sqlite databases containing file information (cre
   optional arguments apply when writing to CSV or database file (ignored otherwise)
 
   * -o, --overwrite - overwrite the outfile if existent
-  * -a, --append - append to the outfile if existent
+  * -u, --update - update SQLite database or append to the CSV outfile if existent
   * -n, --nodots - do not display dots for matches
   * -d DOTS, --dots DOTS - logarithmic number of matching files to display one dot for (i.e. 0=every file, 1=each 10 files, 2=each 100 files...)
                         
