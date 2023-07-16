@@ -56,11 +56,11 @@ class PFSRun:
                 raise PFSRunException("No database opened!?")
 
             self._doCompare = self.getCommonColNames()
-            
+
             # call after source/target database were opened
             # and common column names were set
             self.createpfsout()
-            
+
             # set start time after possible user interaction in createpflout
             startTime = time.time()
 
@@ -85,7 +85,7 @@ class PFSRun:
                 if self._params.OutFileType == 1 and resultStats is not None:
                     self._pfsout.updateStats(resultStats, duration)
                 self._pfsout.close()
-                
+
                 print("Took {0:.2f} seconds.".format(duration))
         finally:
             # close database connections
