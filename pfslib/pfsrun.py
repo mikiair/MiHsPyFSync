@@ -3,8 +3,8 @@
 __author__ = "Michael Heise"
 __copyright__ = "Copyright (C) 2023 by Michael Heise"
 __license__ = "LGPL"
-__version__ = "0.2.0"
-__date__ = "07/16/2023"
+__version__ = "0.2.1"
+__date__ = "07/17/2023"
 
 """Class PFSRun defines the basic file listing comparison behaviour.
 It takes a PFSParams object and performs the comparison.
@@ -96,14 +96,21 @@ class PFSRun:
 
     def openFileListDB(self, dbfilename):
         db = pfsql.opendb(dbfilename)
-        if not pfsql.tableexists(db, "filelist") or not pfsql.tableexists(
-            db, "dirlist"
-        ):
+        
+        try:
+            if not pfsql.tableexists(db, "filelist") or not pfsql.tableexists(
+                db, "dirlist"
+            ):
+                raise PFSRunException(
+                    f"'{dbfilename}' is not a valid file listing database!"
+                )
+            
+            memdb = pfsql.opendb(":memory:")
+            db[0].backup(memdb[0])
+        finally:
             pfsql.closedb(db)
-            raise PFSRunException(
-                f"'{dbfilename}' is not a valid file listing database!"
-            )
-        return db
+            
+        return memdb
 
     def getCommonColNames(self):
         """Get a list of column names present in both 'filelist' tables
